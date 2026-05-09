@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ScoreManager, IRankInfo } from '../utils/ScoreManager';
 import { Difficulty } from '../types';
+import { ITaskUpdateResult, TaskType } from '../utils/TaskManager';
 
 interface GameOverData {
   winner: 'landlord' | 'farmer';
@@ -10,6 +11,7 @@ interface GameOverData {
   baseScore: number;
   multiplier: number;
   playerIsLandlord: boolean;
+  taskUpdateResult?: ITaskUpdateResult;
 }
 
 export class GameOverScene extends Phaser.Scene {
@@ -187,5 +189,118 @@ export class GameOverScene extends Phaser.Scene {
         color: '#ffd700'
       }).setOrigin(0.5);
     }
+
+    this.time.delayedCall(800, () => {
+      this.showTaskProgressPopup();
+    });
+  }
+
+  private showTaskProgressPopup(): void {
+    if (!this.gameData.taskUpdateResult || this.gameData.taskUpdateResult.updatedTasks.length === 0) {
+      return;
+    }
+
+    const popupElements: Phaser.GameObjects.GameObject[] = [];
+    const { updatedTasks } = this.gameData.taskUpdateResult;
+    const hasCompleted = updatedTasks.some(t => t.justCompleted);
+    const totalItems = updatedTasks.length;
+
+    const itemHeight = 85;
+    const headerHeight = 80;
+    const footerHeight = 80;
+    const contentHeight = totalItems * itemHeight;
+    const popupHeight = Math.min(this.scale.height - 100, headerHeight + contentHeight + footerHeight);
+    const popupY = (this.scale.height - popupHeight) / 2;
+
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x000000, 0.8);
+    overlay.fillRect(0, 0, this.scale.width, this.scale.height);
+    popupElements.push(overlay);
+
+    const panel = this.add.graphics();
+    panel.fillStyle(0x14522a, 1);
+    panel.fillRoundedRect(40, popupY, this.scale.width - 80, popupHeight, 15);
+    panel.lineStyle(3, hasCompleted ? 0xffd700 : 0x4caf50, 0.8);
+    panel.strokeRoundedRect(40, popupY, this.scale.width - 80, popupHeight, 15);
+    popupElements.push(panel);
+
+    const titleText = hasCompleted ? '🎉 任务完成！' : '📋 任务进度';
+    const title = this.add.text(this.scale.width / 2, popupY + 45, titleText, {
+      font: 'bold 24px Arial',
+      color: '#ffd700'
+    }).setOrigin(0.5);
+    popupElements.push(title);
+
+    let y = popupY + headerHeight;
+    const itemWidth = this.scale.width - 120;
+    const itemX = 60;
+
+    updatedTasks.forEach(item => {
+      const itemY = y;
+      const isCompleted = item.justCompleted;
+
+      const itemBg = this.add.graphics();
+      itemBg.fillStyle(isCompleted ? 0x2e7d32 : 0x1a5c3a, 0.9);
+      itemBg.fillRoundedRect(itemX, itemY, itemWidth, itemHeight - 10, 8);
+      if (isCompleted) {
+        itemBg.lineStyle(2, 0xffd700, 0.8);
+        itemBg.strokeRoundedRect(itemX, itemY, itemWidth, itemHeight - 10, 8);
+      }
+      popupElements.push(itemBg);
+
+      const typeIcon = item.task.type === TaskType.DAILY ? '📅' : '🏆';
+      const iconText = this.add.text(itemX + 20, itemY + 20, `${typeIcon} ${item.task.icon}`, {
+        font: '22px Arial'
+      });
+      popupElements.push(iconText);
+
+      const titleItem = this.add.text(itemX + 70, itemY + 15, item.task.title, {
+        font: 'bold 16px Arial',
+        color: isCompleted ? '#ffd700' : '#ffffff'
+      });
+      popupElements.push(titleItem);
+
+      const progressText = isCompleted 
+        ? '✓ 已完成' 
+        : `${item.previousProgress} → ${item.progress.current} / ${item.task.target}`;
+      const progress = this.add.text(itemX + 70, itemY + 42, progressText, {
+        font: '13px Arial',
+        color: isCompleted ? '#4caf50' : '#a5d6a7'
+      });
+      popupElements.push(progress);
+
+      if (isCompleted) {
+        const reward = this.add.text(this.scale.width - 80, itemY + 35, `+${item.task.reward}`, {
+          font: 'bold 16px Arial',
+          color: '#ffb74d'
+        }).setOrigin(1, 0.5);
+        popupElements.push(reward);
+      }
+
+      y += itemHeight;
+    });
+
+    const closeBtnY = popupY + popupHeight - 55;
+    const closeBtn = this.add.graphics();
+    closeBtn.fillStyle(0xff6b35, 1);
+    closeBtn.fillRoundedRect(this.scale.width / 2 - 70, closeBtnY, 140, 40, 8);
+    popupElements.push(closeBtn);
+
+    const closeText = this.add.text(this.scale.width / 2, closeBtnY + 20, '知道了', {
+      font: 'bold 17px Arial',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    popupElements.push(closeText);
+
+    const closeZone = this.add.zone(this.scale.width / 2, closeBtnY + 20, 140, 40);
+    closeZone.setInteractive();
+    closeZone.on('pointerdown', () => {
+      popupElements.forEach(element => {
+        if (element && element.active !== false) {
+          element.destroy();
+        }
+      });
+      closeZone.destroy();
+    });
   }
 }

@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import { ICard, IPlayer, Difficulty, PlayerPosition, CardRank, CardSuit } from '../types';
+import { ICard, IPlayer, Difficulty, PlayerPosition, CardRank, CardSuit, CardType } from '../types';
 import { Card } from '../utils/Card';
 import { Deck } from '../utils/Deck';
 import { GameEngine } from '../utils/GameEngine';
 import { CardCounter, ICardCount } from '../utils/CardCounter';
 import { AutoPlayManager } from '../utils/AutoPlayManager';
 import { ScoreManager } from '../utils/ScoreManager';
+import { TaskManager } from '../utils/TaskManager';
+import { CardTypeChecker } from '../utils/CardTypeChecker';
 
 export class GameScene extends Phaser.Scene {
   private difficulty: Difficulty = Difficulty.MEDIUM;
@@ -31,6 +33,9 @@ export class GameScene extends Phaser.Scene {
   
   private aiTimer?: Phaser.Time.TimerEvent;
   private playerStats!: ReturnType<typeof ScoreManager.getDefaultPlayerStats>;
+  private usedBombInGame: boolean = false;
+  private usedRocketInGame: boolean = false;
+  private lastPlayedCardType: CardType = CardType.INVALID;
 
   private bidButtons: Phaser.GameObjects.GameObject[] = [];
   private robButtons: Phaser.GameObjects.GameObject[] = [];
@@ -273,6 +278,9 @@ export class GameScene extends Phaser.Scene {
 
   private startGame(): void {
     this.gamePhase = 'dealing';
+    this.usedBombInGame = false;
+    this.usedRocketInGame = false;
+    this.lastPlayedCardType = CardType.INVALID;
     
     const deck = new Deck();
     const { players, landlordCards } = deck.deal();
@@ -1052,6 +1060,22 @@ export class GameScene extends Phaser.Scene {
     
     this.cardCounter.addPlayedCards(cards);
 
+    const cardType = CardTypeChecker.check(cards);
+    if (cardType.type === CardType.BOMB) {
+      if (playerIndex === 0) {
+        this.usedBombInGame = true;
+      }
+      this.lastPlayedCardType = CardType.BOMB;
+    } else if (cardType.type === CardType.ROCKET) {
+      if (playerIndex === 0) {
+        this.usedRocketInGame = true;
+        this.usedBombInGame = true;
+      }
+      this.lastPlayedCardType = CardType.ROCKET;
+    } else {
+      this.lastPlayedCardType = cardType.type;
+    }
+
     this.lastPlayedCards = cards;
     this.lastPlayerIndex = playerIndex;
 
@@ -1267,6 +1291,17 @@ export class GameScene extends Phaser.Scene {
     this.playerStats = ScoreManager.updateStats(this.playerStats, scoreChange, isPlayerWin);
     ScoreManager.savePlayerStats(this.playerStats);
 
+    const taskData = TaskManager.loadTaskData();
+    const usedRocketToFinish = isPlayerWin && this.usedRocketInGame && this.lastPlayedCardType === CardType.ROCKET;
+    const taskUpdateResult = TaskManager.recordGameEnd(
+      taskData,
+      isPlayerWin,
+      this.players[0].isLandlord,
+      this.usedBombInGame,
+      usedRocketToFinish,
+      Math.max(0, scoreChange)
+    );
+
     this.scene.start('GameOverScene', {
       winner,
       winnerName: winner === 'landlord' 
@@ -1276,7 +1311,8 @@ export class GameScene extends Phaser.Scene {
       isPlayerWin,
       baseScore: this.baseScore,
       multiplier: this.multiplier,
-      playerIsLandlord: this.players[0].isLandlord
+      playerIsLandlord: this.players[0].isLandlord,
+      taskUpdateResult
     });
   }
 }
