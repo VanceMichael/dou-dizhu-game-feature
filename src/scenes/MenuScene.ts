@@ -20,6 +20,7 @@ export class MenuScene extends Phaser.Scene {
     this.createPlayerInfo();
     this.createDifficultySelector();
     this.createStartButton();
+    this.createTaskButton();
     this.createRankButton();
     this.createHelpButton();
   }
@@ -174,20 +175,40 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private createRankButton(): void {
+  private createTaskButton(): void {
     const y = 750;
-    const width = (this.scale.width - 100) / 2;
+    const width = (this.scale.width - 120) / 3;
 
     const button = this.add.graphics();
-    button.fillStyle(0x9c27b0, 0.8);
+    button.fillStyle(0xff9800, 0.8);
     button.fillRoundedRect(40, y, width, 70, 12);
 
-    this.add.text(40 + width / 2, y + 35, '🏆 排行榜', {
+    this.add.text(40 + width / 2, y + 35, '📋 任务', {
       font: 'bold 20px Arial',
       color: '#ffffff'
     }).setOrigin(0.5);
 
     const hitZone = this.add.zone(40 + width / 2, y + 35, width, 70);
+    hitZone.setInteractive();
+    hitZone.on('pointerdown', () => {
+      this.scene.start('TaskScene');
+    });
+  }
+
+  private createRankButton(): void {
+    const y = 750;
+    const width = (this.scale.width - 120) / 3;
+
+    const button = this.add.graphics();
+    button.fillStyle(0x9c27b0, 0.8);
+    button.fillRoundedRect(60 + width, y, width, 70, 12);
+
+    this.add.text(60 + width + width / 2, y + 35, '🏆 排行榜', {
+      font: 'bold 20px Arial',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+
+    const hitZone = this.add.zone(60 + width + width / 2, y + 35, width, 70);
     hitZone.setInteractive();
     hitZone.on('pointerdown', () => {
       this.showLeaderboard();
@@ -196,18 +217,18 @@ export class MenuScene extends Phaser.Scene {
 
   private createHelpButton(): void {
     const y = 750;
-    const width = (this.scale.width - 100) / 2;
+    const width = (this.scale.width - 120) / 3;
 
     const button = this.add.graphics();
     button.fillStyle(0x2196f3, 0.8);
-    button.fillRoundedRect(60 + width, y, width, 70, 12);
+    button.fillRoundedRect(80 + width * 2, y, width, 70, 12);
 
-    this.add.text(60 + width + width / 2, y + 35, '📖 游戏规则', {
+    this.add.text(80 + width * 2 + width / 2, y + 35, '📖 游戏规则', {
       font: 'bold 20px Arial',
       color: '#ffffff'
     }).setOrigin(0.5);
 
-    const hitZone = this.add.zone(60 + width + width / 2, y + 35, width, 70);
+    const hitZone = this.add.zone(80 + width * 2 + width / 2, y + 35, width, 70);
     hitZone.setInteractive();
     hitZone.on('pointerdown', () => {
       this.showRules();
