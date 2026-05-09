@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Difficulty, RankName } from '../types';
 import { ScoreManager, IRankInfo } from '../utils/ScoreManager';
+import { TaskManager } from '../utils/TaskManager';
 
 export class MenuScene extends Phaser.Scene {
   private selectedDifficulty: Difficulty = Difficulty.MEDIUM;
@@ -21,6 +22,7 @@ export class MenuScene extends Phaser.Scene {
     this.createDifficultySelector();
     this.createStartButton();
     this.createRankButton();
+    this.createTaskButton();
     this.createHelpButton();
   }
 
@@ -176,14 +178,14 @@ export class MenuScene extends Phaser.Scene {
 
   private createRankButton(): void {
     const y = 750;
-    const width = (this.scale.width - 100) / 2;
+    const width = (this.scale.width - 120) / 3;
 
     const button = this.add.graphics();
     button.fillStyle(0x9c27b0, 0.8);
     button.fillRoundedRect(40, y, width, 70, 12);
 
     this.add.text(40 + width / 2, y + 35, '🏆 排行榜', {
-      font: 'bold 20px Arial',
+      font: 'bold 18px Arial',
       color: '#ffffff'
     }).setOrigin(0.5);
 
@@ -194,20 +196,53 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private createHelpButton(): void {
+  private createTaskButton(): void {
     const y = 750;
-    const width = (this.scale.width - 100) / 2;
+    const width = (this.scale.width - 120) / 3;
+    const x = 60 + width;
+
+    const unclaimed = TaskManager.getUnclaimedCount();
 
     const button = this.add.graphics();
-    button.fillStyle(0x2196f3, 0.8);
-    button.fillRoundedRect(60 + width, y, width, 70, 12);
+    button.fillStyle(0xff6b35, 0.9);
+    button.fillRoundedRect(x, y, width, 70, 12);
 
-    this.add.text(60 + width + width / 2, y + 35, '📖 游戏规则', {
-      font: 'bold 20px Arial',
+    this.add.text(x + width / 2, y + 28, '📋 任务', {
+      font: 'bold 18px Arial',
       color: '#ffffff'
     }).setOrigin(0.5);
 
-    const hitZone = this.add.zone(60 + width + width / 2, y + 35, width, 70);
+    if (unclaimed > 0) {
+      this.add.text(x + width - 10, y + 8, `${unclaimed}`, {
+        font: 'bold 14px Arial',
+        color: '#ffffff',
+        backgroundColor: '#f44336',
+        padding: { x: 6, y: 2 }
+      }).setOrigin(1, 0);
+    }
+
+    const hitZone = this.add.zone(x + width / 2, y + 35, width, 70);
+    hitZone.setInteractive();
+    hitZone.on('pointerdown', () => {
+      this.scene.start('TaskScene');
+    });
+  }
+
+  private createHelpButton(): void {
+    const y = 750;
+    const width = (this.scale.width - 120) / 3;
+    const x = 80 + width * 2;
+
+    const button = this.add.graphics();
+    button.fillStyle(0x2196f3, 0.8);
+    button.fillRoundedRect(x, y, width, 70, 12);
+
+    this.add.text(x + width / 2, y + 35, '📖 规则', {
+      font: 'bold 18px Arial',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+
+    const hitZone = this.add.zone(x + width / 2, y + 35, width, 70);
     hitZone.setInteractive();
     hitZone.on('pointerdown', () => {
       this.showRules();

@@ -2,6 +2,22 @@ import Phaser from 'phaser';
 import { ScoreManager, IRankInfo } from '../utils/ScoreManager';
 import { Difficulty } from '../types';
 
+interface TaskProgressItem {
+  taskId: string;
+  name: string;
+  description: string;
+  prev: number;
+  current: number;
+  target: number;
+  justCompleted: boolean;
+}
+
+interface TaskProgressResult {
+  dailyProgress: TaskProgressItem[];
+  achievementProgress: TaskProgressItem[];
+  totalReward: number;
+}
+
 interface GameOverData {
   winner: 'landlord' | 'farmer';
   winnerName: string;
@@ -10,6 +26,7 @@ interface GameOverData {
   baseScore: number;
   multiplier: number;
   playerIsLandlord: boolean;
+  taskProgress?: TaskProgressResult;
 }
 
 export class GameOverScene extends Phaser.Scene {
@@ -31,6 +48,7 @@ export class GameOverScene extends Phaser.Scene {
     this.createBackground();
     this.createResultPanel();
     this.createScoreDetails();
+    this.createTaskProgressPanel();
     this.createButtons();
   }
 
@@ -135,8 +153,63 @@ export class GameOverScene extends Phaser.Scene {
     }).setOrigin(1, 0);
   }
 
+  private createTaskProgressPanel(): void {
+    const taskProgress = this.gameData.taskProgress;
+    if (!taskProgress) return;
+
+    const allItems = [
+      ...taskProgress.dailyProgress.map(p => ({ ...p, category: 'daily' as const })),
+      ...taskProgress.achievementProgress.map(p => ({ ...p, category: 'achievement' as const }))
+    ];
+
+    if (allItems.length === 0) return;
+
+    const startY = 700;
+    const panelHeight = Math.min(allItems.length * 45 + 60, 250);
+
+    const panel = this.add.graphics();
+    panel.fillStyle(0x14522a, 0.9);
+    panel.fillRoundedRect(50, startY, this.scale.width - 100, panelHeight, 15);
+    panel.lineStyle(2, 0xff6b35, 0.6);
+    panel.strokeRoundedRect(50, startY, this.scale.width - 100, panelHeight, 15);
+
+    this.add.text(this.scale.width / 2, startY + 20, '📋 任务进度', {
+      font: 'bold 20px Arial',
+      color: '#ffd700'
+    }).setOrigin(0.5);
+
+    let y = startY + 48;
+    for (const item of allItems) {
+      if (y > startY + panelHeight - 20) break;
+
+      const icon = item.category === 'daily' ? '📅' : '🏆';
+      const statusIcon = item.justCompleted ? '✅' : '📈';
+      const progressText = `${item.current}/${item.target}`;
+
+      const nameColor = item.justCompleted ? '#4caf50' : '#ffffff';
+      this.add.text(70, y, `${icon} ${statusIcon} ${item.name}`, {
+        font: '16px Arial',
+        color: nameColor
+      });
+
+      this.add.text(this.scale.width - 70, y, progressText, {
+        font: 'bold 16px Arial',
+        color: item.justCompleted ? '#ffd700' : '#a5d6a7'
+      }).setOrigin(1, 0);
+
+      y += 35;
+    }
+
+    if (taskProgress.totalReward > 0) {
+      this.add.text(this.scale.width / 2, y + 5, `🎁 获得奖励: +${taskProgress.totalReward}经验`, {
+        font: 'bold 16px Arial',
+        color: '#ffd700'
+      }).setOrigin(0.5);
+    }
+  }
+
   private createButtons(): void {
-    const y = 730;
+    const y = 980;
     const buttonWidth = (this.scale.width - 140) / 2;
     const spacing = 40;
 
@@ -175,7 +248,7 @@ export class GameOverScene extends Phaser.Scene {
       this.scene.start('MenuScene');
     });
 
-    const statsY = 830;
+    const statsY = 1080;
     this.add.text(this.scale.width / 2, statsY, `战绩: ${this.playerStats.wins}胜 ${this.playerStats.losses}负`, {
       font: '16px Arial',
       color: '#a5d6a7'
