@@ -175,7 +175,7 @@ export class CardTypeChecker {
       return false;
     }
 
-    switch (b.type) {
+    switch (b.type as CardType) {
       case CardType.SINGLE:
       case CardType.PAIR:
       case CardType.TRIPLE:

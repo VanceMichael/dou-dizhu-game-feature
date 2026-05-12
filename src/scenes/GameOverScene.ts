@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ScoreManager, IRankInfo } from '../utils/ScoreManager';
-import { Difficulty } from '../types';
+import { TaskManager, ITaskProgress } from '../utils/TaskManager';
+import { Difficulty, IGameSessionStats } from '../types';
 
 interface GameOverData {
   winner: 'landlord' | 'farmer';
@@ -10,12 +11,18 @@ interface GameOverData {
   baseScore: number;
   multiplier: number;
   playerIsLandlord: boolean;
+  sessionStats?: IGameSessionStats;
 }
 
 export class GameOverScene extends Phaser.Scene {
   private gameData!: GameOverData;
   private playerStats!: ReturnType<typeof ScoreManager.getDefaultPlayerStats>;
   private rankInfo!: IRankInfo;
+  private taskUpdateResult?: {
+    completedTasks: ITaskProgress[];
+    progressedTasks: ITaskProgress[];
+    totalReward: number;
+  };
 
   constructor() {
     super({ key: 'GameOverScene' });
@@ -25,6 +32,16 @@ export class GameOverScene extends Phaser.Scene {
     this.gameData = data;
     this.playerStats = ScoreManager.loadPlayerStats('player_0', '玩家');
     this.rankInfo = ScoreManager.getRankInfo(this.playerStats.totalScore);
+    
+    if (data.sessionStats) {
+      this.taskUpdateResult = TaskManager.processGameSession(data.sessionStats);
+      
+      if (this.taskUpdateResult.totalReward > 0) {
+        this.playerStats.totalScore += this.taskUpdateResult.totalReward;
+        ScoreManager.savePlayerStats(this.playerStats);
+        this.rankInfo = ScoreManager.getRankInfo(this.playerStats.totalScore);
+      }
+    }
   }
 
   create(): void {
@@ -32,6 +49,12 @@ export class GameOverScene extends Phaser.Scene {
     this.createResultPanel();
     this.createScoreDetails();
     this.createButtons();
+    
+    if (this.taskUpdateResult && this.taskUpdateResult.completedTasks.length > 0) {
+      this.time.delayedCall(500, () => {
+        this.showTaskProgressPopup();
+      });
+    }
   }
 
   private createBackground(): void {
@@ -187,5 +210,142 @@ export class GameOverScene extends Phaser.Scene {
         color: '#ffd700'
       }).setOrigin(0.5);
     }
+  }
+
+  private showTaskProgressPopup(): void {
+    if (!this.taskUpdateResult) return;
+
+    const { completedTasks, progressedTasks, totalReward } = this.taskUpdateResult;
+
+    if (completedTasks.length === 0 && progressedTasks.length === 0) {
+      return;
+    }
+
+    const popupElements: Phaser.GameObjects.GameObject[] = [];
+
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x000000, 0.7);
+    overlay.fillRect(0, 0, this.scale.width, this.scale.height);
+    popupElements.push(overlay);
+
+    const panelHeight = 500;
+    const panelY = (this.scale.height - panelHeight) / 2;
+
+    const panel = this.add.graphics();
+    panel.fillStyle(0x14522a, 1);
+    panel.fillRoundedRect(50, panelY, this.scale.width - 100, panelHeight, 20);
+    panel.lineStyle(3, 0x4caf50, 0.6);
+    panel.strokeRoundedRect(50, panelY, this.scale.width - 100, panelHeight, 20);
+    popupElements.push(panel);
+
+    const titleText = this.add.text(this.scale.width / 2, panelY + 35, '🎯 任务进度更新', {
+      font: 'bold 26px Arial',
+      color: '#ffd700'
+    }).setOrigin(0.5);
+    popupElements.push(titleText);
+
+    let currentY = panelY + 80;
+
+    if (completedTasks.length > 0) {
+      const completedLabel = this.add.text(80, currentY, '✅ 完成的任务:', {
+        font: 'bold 18px Arial',
+        color: '#4caf50'
+      });
+      popupElements.push(completedLabel);
+      currentY += 35;
+
+      completedTasks.forEach((taskItem) => {
+        const { task } = taskItem;
+        const taskTitle = this.add.text(100, currentY, `${task.icon} ${task.title}`, {
+          font: '16px Arial',
+          color: '#ffffff'
+        });
+        popupElements.push(taskTitle);
+        
+        const rewardText = this.add.text(this.scale.width - 80, currentY, `+${task.reward}`, {
+          font: 'bold 16px Arial',
+          color: '#ffd700'
+        }).setOrigin(1, 0);
+        popupElements.push(rewardText);
+        currentY += 28;
+      });
+      currentY += 15;
+    }
+
+    if (progressedTasks.length > 0) {
+      const progressLabel = this.add.text(80, currentY, '📈 进度更新:', {
+        font: 'bold 18px Arial',
+        color: '#2196f3'
+      });
+      popupElements.push(progressLabel);
+      currentY += 35;
+
+      progressedTasks.slice(0, 5).forEach((taskItem) => {
+        const { task, progress } = taskItem;
+        const taskTitle = this.add.text(100, currentY, `${task.icon} ${task.title}`, {
+          font: '16px Arial',
+          color: '#a5d6a7'
+        });
+        popupElements.push(taskTitle);
+        
+        const progressText = this.add.text(this.scale.width - 80, currentY, `${progress}/${task.target}`, {
+          font: '16px Arial',
+          color: '#c8e6c9'
+        }).setOrigin(1, 0);
+        popupElements.push(progressText);
+        currentY += 28;
+      });
+
+      if (progressedTasks.length > 5) {
+        const moreText = this.add.text(100, currentY, `...还有 ${progressedTasks.length - 5} 个任务进度更新`, {
+          font: '14px Arial',
+          color: '#66bb6a'
+        });
+        popupElements.push(moreText);
+        currentY += 28;
+      }
+    }
+
+    if (totalReward > 0) {
+      const dividerY = panelY + panelHeight - 100;
+      const divider = this.add.graphics();
+      divider.lineStyle(1, 0x3d8c5a, 0.5);
+      divider.lineBetween(70, dividerY, this.scale.width - 70, dividerY);
+      popupElements.push(divider);
+
+      const rewardLabel = this.add.text(80, dividerY + 25, '获得经验奖励:', {
+        font: 'bold 18px Arial',
+        color: '#ffffff'
+      });
+      popupElements.push(rewardLabel);
+      
+      const rewardValue = this.add.text(this.scale.width - 80, dividerY + 25, `+${totalReward}`, {
+        font: 'bold 24px Arial',
+        color: '#ffd700'
+      }).setOrigin(1, 0);
+      popupElements.push(rewardValue);
+    }
+
+    const closeBtn = this.add.graphics();
+    closeBtn.fillStyle(0xff6b35, 1);
+    closeBtn.fillRoundedRect(this.scale.width / 2 - 70, panelY + panelHeight - 65, 140, 45, 10);
+    popupElements.push(closeBtn);
+    
+    const closeText = this.add.text(this.scale.width / 2, panelY + panelHeight - 42, '知道了', {
+      font: 'bold 18px Arial',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+    popupElements.push(closeText);
+
+    const closeZone = this.add.zone(this.scale.width / 2, panelY + panelHeight - 42, 140, 45);
+    closeZone.setInteractive();
+    closeZone.on('pointerdown', () => {
+      popupElements.forEach(element => {
+        if (element && element.active !== false) {
+          element.destroy();
+        }
+      });
+      closeZone.destroy();
+    });
   }
 }

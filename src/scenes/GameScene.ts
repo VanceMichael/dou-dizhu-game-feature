@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { ICard, IPlayer, Difficulty, PlayerPosition, CardRank, CardSuit } from '../types';
+import { ICard, IPlayer, Difficulty, PlayerPosition, CardRank, CardSuit, CardType } from '../types';
 import { Card } from '../utils/Card';
 import { Deck } from '../utils/Deck';
 import { GameEngine } from '../utils/GameEngine';
 import { CardCounter, ICardCount } from '../utils/CardCounter';
 import { AutoPlayManager } from '../utils/AutoPlayManager';
 import { ScoreManager } from '../utils/ScoreManager';
+import { CardTypeChecker } from '../utils/CardTypeChecker';
 
 export class GameScene extends Phaser.Scene {
   private difficulty: Difficulty = Difficulty.MEDIUM;
@@ -35,6 +36,12 @@ export class GameScene extends Phaser.Scene {
   private bidButtons: Phaser.GameObjects.GameObject[] = [];
   private robButtons: Phaser.GameObjects.GameObject[] = [];
   private cardCounterElements: Phaser.GameObjects.GameObject[] = [];
+
+  private sessionStats = {
+    usedBomb: false,
+    usedRocket: false,
+    endedWithRocket: false
+  };
 
   constructor() {
     super({ key: 'GameScene' });
@@ -1048,6 +1055,14 @@ export class GameScene extends Phaser.Scene {
   private playCards(playerIndex: number, cards: ICard[]): void {
     const player = this.players[playerIndex];
     
+    const combo = CardTypeChecker.check(cards);
+    if (combo.type === CardType.BOMB) {
+      this.sessionStats.usedBomb = true;
+    }
+    if (combo.type === CardType.ROCKET) {
+      this.sessionStats.usedRocket = true;
+    }
+    
     player.cards = player.cards.filter(c => !cards.some(ec => ec.id === c.id));
     
     this.cardCounter.addPlayedCards(cards);
@@ -1267,6 +1282,10 @@ export class GameScene extends Phaser.Scene {
     this.playerStats = ScoreManager.updateStats(this.playerStats, scoreChange, isPlayerWin);
     ScoreManager.savePlayerStats(this.playerStats);
 
+    const landlordWinStreak = this.players[0].isLandlord && isPlayerWin 
+      ? this.playerStats.currentWinStreak 
+      : 0;
+
     this.scene.start('GameOverScene', {
       winner,
       winnerName: winner === 'landlord' 
@@ -1276,7 +1295,17 @@ export class GameScene extends Phaser.Scene {
       isPlayerWin,
       baseScore: this.baseScore,
       multiplier: this.multiplier,
-      playerIsLandlord: this.players[0].isLandlord
+      playerIsLandlord: this.players[0].isLandlord,
+      sessionStats: {
+        playerIsLandlord: this.players[0].isLandlord,
+        isWin: isPlayerWin,
+        usedBomb: this.sessionStats.usedBomb,
+        usedRocket: this.sessionStats.usedRocket,
+        endedWithRocket: this.sessionStats.endedWithRocket,
+        score: scoreChange > 0 ? scoreChange : 0,
+        landlordWinStreak,
+        totalWinStreak: this.playerStats.currentWinStreak
+      }
     });
   }
 }
