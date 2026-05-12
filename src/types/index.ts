@@ -133,3 +133,41 @@ export interface IRankConfig {
   maxScore: number;
   icon: string;
 }
+
+export enum TaskType {
+  DAILY = 'daily',
+  ACHIEVEMENT = 'achievement'
+}
+
+export enum TaskStatus {
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CLAIMED = 'claimed'
+}
+
+export interface ITask {
+  id: string;
+  type: TaskType;
+  title: string;
+  description: string;
+  target: number;
+  reward: number;
+  icon: string;
+}
+
+export interface IPlayerTask {
+  taskId: string;
+  progress: number;
+  status: TaskStatus;
+}
+
+export interface IGameSessionStats {
+  playerIsLandlord: boolean;
+  isWin: boolean;
+  usedBomb: boolean;
+  usedRocket: boolean;
+  endedWithRocket: boolean;
+  score: number;
+  landlordWinStreak: number;
+  totalWinStreak: number;
+}
